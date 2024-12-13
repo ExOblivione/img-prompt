@@ -50,21 +50,6 @@ def analyze_image(image):
         gender_neutral_caption=True,
         language="en"
     )
-
-    if result.caption is not None:
-        print(" Caption:")
-        print(f"   '{result.caption.text}', Confidence {result.caption.confidence:.4f}")
-
-    if result.dense_captions is not None:
-        print(" Dense Captions:")
-        for caption in result.dense_captions.list:
-            print(f"   '{caption.text}', {caption.bounding_box}, Confidence: {caption.confidence:.4f}")
-
-    if result.smart_crops is not None:
-        print(" Smart Cropping:")
-        for smart_crop in result.smart_crops.list:
-            print(f"   Aspect ratio {smart_crop.aspect_ratio}: Smart crop {smart_crop.bounding_box}")
-
     return result
 
 # def search_incident_data(query):
@@ -72,16 +57,16 @@ def analyze_image(image):
 #     results = search_client.search(search_query)
 #     return results
 
-def generate_incident_description(image_analysis, search_results):
-    # Combine image analysis and search results to generate incident description
-    description = f"Damage detected: {image_analysis.description.captions[0].text}. Historical data: {search_results}."
+def generate_incident_description(image_analysis):
+    # Combine image analysis (and search results) to generate incident description Historical data: {search_results}
+    description = f"Damage detected: {image_analysis.caption.text}."
     return description
 
 def get_chat_response(message):
-    system_message = PromptTemplate.from_string(
-        prompt_template="""
-            system:
-            You get a desription of an image based on which you need to create a detailed incident description for a 
+    system_message = {
+        "role": "system",
+        "content": """
+            Based on the description below about an image, you need to create a detailed incident description for a 
             report with date and time details.
 
             Example:
@@ -92,10 +77,19 @@ def get_chat_response(message):
             02:15 PM. The crane's lifting mechanism failed, causing the container to drop from a height of 
             about 10 feet. The container sustained significant structural damage, including multiple dents 
             and a partially collapsed right front corner. Fortunately, no personnel were injured during the incident."
-            """)
+            """
+    }
+    
+    user_message = {
+        "role": "user",
+        "content": message
+    }
+    
+    messages = [system_message, user_message]
+    
     response = chat.complete(
         model="gpt-4o",
-        messages=system_message + message,
+        messages=messages,
         temperature=1,
         frequency_penalty=0.5,
         presence_penalty=0.5,
@@ -121,6 +115,6 @@ if __name__ == "__main__":
     # image_path = upload_image(image)
     image_analysis = analyze_image(image)
     # search_results = search_incident_data(image_analysis.description.captions[0].text)
-    # incident_description = generate_incident_description(image_analysis, search_results)
-    # print(incident_description)
-    print(image_analysis)
+    incident_description = generate_incident_description(image_analysis)
+    response = get_chat_response(incident_description)
+    print(response.choices[0].message.content)
